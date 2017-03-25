@@ -8,10 +8,10 @@
 #
 # Copyright (C) 2017 LeoAttn
 
-firewallDir='/usr/local/bin/firewall.d'
+firewallDir='.'
 binDir='/sbin'
 PATH=$binDir:$PATH
-VERSION=1.0
+VERSION=1.0.1
 err=0
 
 if ! [ -x $binDir/iptables ]; then
@@ -55,7 +55,7 @@ Options:
 
 #-----
 
-if [ "$#" -eq 0 ]; then
+if [ $# -eq 0 ]; then
   echo "Bad usage: no options selected !\n" > /dev/stderr
   echo "$help"
   exit 10
@@ -63,7 +63,7 @@ fi
 
 
 addRule() {
-  if [ "$#" -ne 3 ]; then
+  if [ $# -ne 3 ]; then
     echo "Invalid number of parameters: $#" > /dev/stderr
     err=12
     return 12
@@ -83,7 +83,7 @@ addRule() {
 }
 
 removeRule() {
-  if [ "$#" -ne 3 ]; then
+  if [ $# -ne 3 ]; then
     echo "Invalid number of parameters: $#" > /dev/stderr
     err=12
     return 12
@@ -166,5 +166,4 @@ case $1 in
 	exit 11;;
 esac
 
-#echo "--- FIN ---"
 exit $err
