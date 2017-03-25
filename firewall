@@ -1,0 +1,170 @@
+#!/bin/sh
+# Configure the firewall with iptables.
+#
+# Error codes :
+#  - 1  = warning
+#  - 1x = error on parameters
+#  - 2x = error on iptables
+#
+# Copyright (C) 2017 LeoAttn
+
+firewallDir='/usr/local/bin/firewall.d'
+binDir='/sbin'
+PATH=$binDir:$PATH
+VERSION=1.0
+err=0
+
+if ! [ -x $binDir/iptables ]; then
+  echo "Fatal error: iptables not found !" > /dev/stderr
+  exit 20
+fi
+
+version="firewall $VERSION
+Copyright (C) 2017 LeoAttn 
+
+Written by LeoAttn."
+
+help="Usage: firewall [OPTION]
+Configure the firewall with iptables.
+
+Options:  
+  -l, --list [CHAIN]	display all rules (-n for numbers)
+      --list-rules	display all rules commands 
+  -b, --basic		set basic security rules on iptables
+  -c, --clear		clear all rules on iptables
+      --all-accept	set the policy of default chains to ACCEPT
+      --all-drop	set the policy of default chains to DROP
+
+  -A, --append CHAIN PROTOCOL PORT	append rule with specified values
+  -C, --check CHAIN PROTOCOL PORT	check if rule exist
+  -D, --delete CHAIN PROTOCOL PORT	delete rule with specified values
+  -i, --add-input PROTOCOL PORT		append INPUT rule
+  -I, --rm-input PROTOCOL PORT		delete INPUT rule
+  -o, --add-output PROTOCOL PORT	append OUTPUT rule
+  -O, --rm-output PROTOCOL PORT		delete OUTPUT rule
+
+      --ssh		add rules for ssh I/O (port 22)
+      --http		add rules for http I/O (port 80)
+      --https		add rules for https I/O (port 443)
+  -n, --node		add rules for node I/O (port 3000)
+  -p, --proxy		add rules for KiddieProxy TCP I/O (port 42000)
+      --netbios		add rules for NetBIOS I/O
+
+  -h, --help		display this help and exit
+      --version		display version information and exit"
+
+#-----
+
+if [ "$#" -eq 0 ]; then
+  echo "Bad usage: no options selected !\n" > /dev/stderr
+  echo "$help"
+  exit 10
+fi
+
+
+addRule() {
+  if [ "$#" -ne 3 ]; then
+    echo "Invalid number of parameters: $#" > /dev/stderr
+    err=12
+    return 12
+  fi
+  if ! iptables -t filter -C $1 -p $2 --dport $3 -j ACCEPT 2>/dev/null; then
+    if iptables -t filter -A $1 -p $2 --dport $3 -j ACCEPT; then
+    echo "Rule $1 - $2:$3 is created"
+  else
+    echo "Error: $1 - $2:$3" > /dev/stderr
+    err=21
+  fi
+  else
+    echo "Rule $1 - $2:$3 already exist"
+    err=1
+  fi
+  
+}
+
+removeRule() {
+  if [ "$#" -ne 3 ]; then
+    echo "Invalid number of parameters: $#" > /dev/stderr
+    err=12
+    return 12
+  fi
+  if iptables -t filter -C $1 -p $2 --dport $3 -j ACCEPT 2>/dev/null; then
+    if iptables -t filter -D $1 -p $2 --dport $3 -j ACCEPT; then
+    echo "Rule $1 - $2:$3 is deleted"
+  else
+    echo "Error: $1 - $2:$3" > /dev/stderr
+    err=21
+  fi
+  else
+    echo "Rule $1 - $2:$3 is not created"
+    err=1
+  fi
+  
+}
+
+serverRules() {
+  addRule INPUT tcp $1
+  addRule OUTPUT tcp $1
+}
+
+
+case $1 in
+  -h|--help)
+	echo "$help"
+	exit 0;;
+  --version)
+	echo "$version"
+	exit 0;;
+
+  -l|--list)
+	shift
+	iptables -L $*;;
+  --list-rules)
+	shift
+	iptables -S $*;;
+  -b|--basic)	$firewallDir/basic.sh;;
+  -c|--clear)	$firewallDir/clear.sh;;
+  --all-accept)	$firewallDir/all-accept.sh;;
+  --all-drop)	$firewallDir/all-drop.sh;;
+
+  -A|--append)
+	shift
+	addRule $*;;
+  -C|--check)
+	shift
+	checkRule $*;;
+  -D|--delete)
+	shift
+	removeRule $*;;
+  -i|--add-input)
+	shift
+	addRule INPUT $*;;
+  -I|--rm-input)
+	shift
+	removeRule INPUT $*;;
+  -o|--add-output)
+	shift
+	addRule OUTPUT $*;;
+  -O|--rm-output)
+	shift
+	removeRule OUTPUT $*;;
+
+  --ssh)	serverRules 22;;
+  --http)	serverRules 80;;
+  --https)	serverRules 443;;
+  -n|--node)	serverRules 3000;;
+  -p|--proxy)	serverRules 42000;;
+  --netbios)
+	addRule INPUT udp 137
+	addRule OUTPUT udp 137
+	addRule INPUT udp 138
+	addRule OUTPUT udp 138
+	serverRules 139;;
+
+  *)
+	echo "Invalid parameters : $1" > /dev/stderr
+	exit 11;;
+esac
+
+#echo "--- FIN ---"
+exit $err
