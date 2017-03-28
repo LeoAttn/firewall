@@ -5,6 +5,7 @@
 #  - 1  = warning
 #  - 1x = error on parameters
 #  - 2x = error on iptables
+#  - 3x = error on permission
 #
 # Copyright (C) 2017 LeoAttn
 
@@ -13,6 +14,11 @@ binDir='/sbin'
 PATH=$binDir:$PATH
 VERSION=1.0.1
 err=0
+
+if [ $(whoami) != 'root' ]; then 
+  echo "Fatal error: Permission denied (you must be root) !" > /dev/stderr
+  exit 30
+fi
 
 if ! [ -x $binDir/iptables ]; then
   echo "Fatal error: iptables not found !" > /dev/stderr
@@ -32,6 +38,8 @@ Options:
       --list-rules	display all rules commands 
   -b, --basic		set basic security rules on iptables
   -c, --clear		clear all rules on iptables
+  -a, --accept CHAIN    set the policy to ACCEPT
+  -d, --drop CHAIN      set the policy to DROP
       --all-accept	set the policy of default chains to ACCEPT
       --all-drop	set the policy of default chains to DROP
 
@@ -48,7 +56,7 @@ Options:
       --https		add rules for https I/O (port 443)
   -n, --node		add rules for node I/O (port 3000)
   -p, --proxy		add rules for KiddieProxy TCP I/O (port 42000)
-      --netbios		add rules for NetBIOS I/O
+      --netbios		add rules for NetBIOS Output
 
   -h, --help		display this help and exit
       --version		display version information and exit"
@@ -62,6 +70,20 @@ if [ $# -eq 0 ]; then
 fi
 
 
+changePolicy() {
+  if [ $# -ne 2 ]; then
+    echo "Invalid number of parameters: $#" > /dev/stderr
+    err=12
+    return 12
+  fi
+  if iptables -t filter -P $2 $1; then
+    echo "Policy $2 - $1"
+  else
+    echo "Error: $2 - $1" > /dev/stderr
+    err=23
+  fi
+}
+
 addRule() {
   if [ $# -ne 3 ]; then
     echo "Invalid number of parameters: $#" > /dev/stderr
@@ -70,11 +92,11 @@ addRule() {
   fi
   if ! iptables -t filter -C $1 -p $2 --dport $3 -j ACCEPT 2>/dev/null; then
     if iptables -t filter -A $1 -p $2 --dport $3 -j ACCEPT; then
-    echo "Rule $1 - $2:$3 is created"
-  else
-    echo "Error: $1 - $2:$3" > /dev/stderr
-    err=21
-  fi
+      echo "Rule $1 - $2:$3 is created"
+    else
+      echo "Error: $1 - $2:$3" > /dev/stderr
+      err=21
+    fi
   else
     echo "Rule $1 - $2:$3 already exist"
     err=1
@@ -90,11 +112,11 @@ removeRule() {
   fi
   if iptables -t filter -C $1 -p $2 --dport $3 -j ACCEPT 2>/dev/null; then
     if iptables -t filter -D $1 -p $2 --dport $3 -j ACCEPT; then
-    echo "Rule $1 - $2:$3 is deleted"
-  else
-    echo "Error: $1 - $2:$3" > /dev/stderr
-    err=21
-  fi
+      echo "Rule $1 - $2:$3 is deleted"
+    else
+      echo "Error: $1 - $2:$3" > /dev/stderr
+      err=22
+    fi
   else
     echo "Rule $1 - $2:$3 is not created"
     err=1
@@ -124,6 +146,8 @@ case $1 in
 	iptables -S $*;;
   -b|--basic)	$firewallDir/basic.sh;;
   -c|--clear)	$firewallDir/clear.sh;;
+  -a|--accept)  changePolicy ACCEPT $2;;
+  -d|--drop)    changePolicy DROP $2;;
   --all-accept)	$firewallDir/all-accept.sh;;
   --all-drop)	$firewallDir/all-drop.sh;;
 
@@ -155,11 +179,9 @@ case $1 in
   -n|--node)	serverRules 3000;;
   -p|--proxy)	serverRules 42000;;
   --netbios)
-	addRule INPUT udp 137
 	addRule OUTPUT udp 137
-	addRule INPUT udp 138
 	addRule OUTPUT udp 138
-	serverRules 139;;
+	addRule OUTPUT tcp 139;;
 
   *)
 	echo "Invalid parameters : $1" > /dev/stderr
