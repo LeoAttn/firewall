@@ -9,13 +9,13 @@
 #
 # Copyright (C) 2017 LeoAttn
 
-firewallDir='.'
+firewallDir='/home/leo/Projets/firewall'
 binDir='/sbin'
 PATH=$binDir:$PATH
-VERSION=1.1.0
+VERSION=1.2.0
 err=0
 
-if [ $(whoami) != 'root' ]; then 
+if [ $(whoami) != 'root' ] && [ $1 != '-h' ] && [ $1 != '--help' ] && [ $1 != '--version' ]; then 
   echo "Fatal error: Permission denied (you must be root) !" > /dev/stderr
   exit 30
 fi
@@ -46,16 +46,17 @@ Options:
   -A, --append CHAIN PROTOCOL PORT	append rule with specified values
   -C, --check CHAIN PROTOCOL PORT	check if rule exist
   -D, --delete CHAIN PROTOCOL PORT	delete rule with specified values
-  -i, --add-input PROTOCOL PORT		append INPUT rule
-  -I, --rm-input PROTOCOL PORT		delete INPUT rule
-  -o, --add-output PROTOCOL PORT	append OUTPUT rule
-  -O, --rm-output PROTOCOL PORT		delete OUTPUT rule
+  -i, --add-input PORT		        append INPUT TCP rule
+  -I, --rm-input PORT                   delete INPUT TCP rule
+  -o, --add-output PORT	                append OUTPUT TCP rule
+  -O, --rm-output PORT		        delete OUTPUT TCP rule
 
       --ssh		add rules for ssh I/O (port 22)
       --http		add rules for http I/O (port 80)
       --https		add rules for https I/O (port 443)
   -n, --node		add rules for node I/O (port 3000)
   -p, --proxy		add rules for KiddieProxy TCP I/O (port 42000)
+      --netdata         add rules for netdata I/O (port 19999)
       --netbios		add rules for NetBIOS Output
 
   -h, --help		display this help and exit
@@ -162,22 +163,23 @@ case $1 in
 	removeRule $*;;
   -i|--add-input)
 	shift
-	addRule INPUT $*;;
+	addRule INPUT tcp $*;;
   -I|--rm-input)
 	shift
-	removeRule INPUT $*;;
+	removeRule INPUT tcp $*;;
   -o|--add-output)
 	shift
-	addRule OUTPUT $*;;
+	addRule OUTPUT tcp $*;;
   -O|--rm-output)
 	shift
-	removeRule OUTPUT $*;;
+	removeRule OUTPUT tcp $*;;
 
   --ssh)	serverRules 22;;
   --http)	serverRules 80;;
   --https)	serverRules 443;;
   -n|--node)	serverRules 3000;;
   -p|--proxy)	serverRules 42000;;
+  --netdata)    serverRules 19999;;
   --netbios)
 	addRule OUTPUT udp 137
 	addRule OUTPUT udp 138
